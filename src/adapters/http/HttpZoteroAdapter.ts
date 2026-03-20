@@ -19,17 +19,20 @@ export class HttpZoteroAdapter implements ZoteroPort {
   private readonly baseUrl: string;
   private readonly apiKey?: string;
   private readonly userId?: string;
+  private readonly translationServerUrl: string;
 
   constructor(
     http: HttpClient,
     baseUrl: string,
     apiKey?: string,
-    userId?: string
+    userId?: string,
+    translationServerUrl?: string
   ) {
     this.http = http;
     this.baseUrl = baseUrl.replace(/\/+$/, "");
     this.apiKey = apiKey;
     this.userId = userId;
+    this.translationServerUrl = translationServerUrl ?? "http://localhost:1969";
   }
 
   // ── Query methods ──────────────────────────────────────────────
@@ -410,6 +413,41 @@ export class HttpZoteroAdapter implements ZoteroPort {
       `${this.libraryPrefix(library)}/items/${itemKey}/file`
     );
     return url;
+  }
+
+  // ── Translation Server methods ────────────────────────────────
+
+  async resolveIdentifier(identifier: string): Promise<JsonValue> {
+    const url = `${this.translationServerUrl}/search`;
+    const response = await this.http.request("POST", url, {
+      headers: { "Content-Type": "text/plain" },
+      body: identifier,
+    });
+    if (response.status === 501) {
+      throw new ExternalToolError("No translator available for this identifier.");
+    }
+    return this.parseResponse(response);
+  }
+
+  async scrapeUrl(url: string): Promise<JsonValue> {
+    const tsUrl = `${this.translationServerUrl}/web`;
+    const response = await this.http.request("POST", tsUrl, {
+      headers: { "Content-Type": "text/plain" },
+      body: url,
+    });
+    if (response.status === 501) {
+      throw new ExternalToolError("No translator available for this URL.");
+    }
+    return this.parseResponse(response);
+  }
+
+  async importBibliography(text: string): Promise<JsonValue> {
+    const url = `${this.translationServerUrl}/import`;
+    const response = await this.http.request("POST", url, {
+      headers: { "Content-Type": "text/plain" },
+      body: text,
+    });
+    return this.parseResponse(response);
   }
 
   // ── Helpers ────────────────────────────────────────────────────

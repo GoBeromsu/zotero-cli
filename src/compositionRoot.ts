@@ -18,6 +18,7 @@ import { ExportCommand } from "./commands/exportCommand.js";
 import { FulltextCommand } from "./commands/fulltextCommand.js";
 import { TemplateCommand } from "./commands/templateCommand.js";
 import { TypesInfoCommand } from "./commands/typesInfoCommand.js";
+import { ImportCommand } from "./commands/importCommand.js";
 
 export interface Runtime {
   output: OutputPort;
@@ -31,7 +32,9 @@ export function createRuntime(): Runtime {
     apiKey: process.env["ZOTERO_API_KEY"],
     userId: process.env["ZOTERO_USER_ID"] ?? "0",
     baseUrl:
-      process.env["ZOTERO_BASE_URL"] ?? "http://localhost:23119/api"
+      process.env["ZOTERO_BASE_URL"] ?? "http://localhost:23119/api",
+    translationServerUrl:
+      process.env["ZOTERO_TRANSLATION_SERVER"] ?? "http://localhost:1969",
   };
 
   const http = new NodeHttpClient();
@@ -39,7 +42,8 @@ export function createRuntime(): Runtime {
     http,
     config.baseUrl,
     config.apiKey,
-    config.userId
+    config.userId,
+    config.translationServerUrl
   );
   const output = new ConsoleOutputAdapter();
 
@@ -58,6 +62,7 @@ export function createRuntime(): Runtime {
   registry.register(new FulltextCommand());
   registry.register(new TemplateCommand());
   registry.register(new TypesInfoCommand());
+  registry.register(new ImportCommand());
 
   return { output, zotero, registry, config };
 }

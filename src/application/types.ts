@@ -23,4 +23,5 @@ export interface ZoteroConfig {
   apiKey?: string;
   userId?: string;
   baseUrl: string;
+  translationServerUrl?: string;
 }

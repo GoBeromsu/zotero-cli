@@ -7,7 +7,7 @@ Same architecture as [devonthink-cli](https://github.com/GoBeromsu/devonthink-cl
 ## Install
 
 ```bash
-npm install -g @goberomsu/zotero-cli
+npm install -g @beomsukoh/zotero-cli
 ```
 
 ## Quick Start
@@ -45,6 +45,16 @@ zt types
 
 # Show fields for a specific type
 zt types journalArticle
+
+# Import paper by DOI (requires Translation Server)
+docker run -p 1969:1969 zotero/translation-server
+zt import --doi "10.1145/3025453.3025912"
+
+# Import from URL
+zt import --url "https://arxiv.org/abs/2301.01234"
+
+# Import PDF: resolve DOI from filename, create item, attach PDF
+zt import ./10.1234_example.pdf
 ```
 
 ## Configuration
@@ -54,6 +64,7 @@ zt types journalArticle
 | `ZOTERO_BASE_URL` | `http://localhost:23119/api` | API base URL |
 | `ZOTERO_API_KEY` | — | API key (required for writes) |
 | `ZOTERO_USER_ID` | `0` | User ID (`0` = local API) |
+| `ZOTERO_TRANSLATION_SERVER` | `http://localhost:1969` | Translation Server URL (for `import`) |
 
 **Local mode** (reads only, Zotero desktop must be running):
 ```bash
@@ -83,6 +94,7 @@ export ZOTERO_BASE_URL=https://api.zotero.org
 | `zt attach <file> --key <key>` | Attach file to item (`--content-type`) |
 | `zt export --format <fmt>` | Export items (bibtex, ris, csljson, csv, tei, etc.) |
 | `zt fulltext <key>` | Get full-text content |
+| `zt import` | Import from DOI, ISBN, arXiv, URL, BibTeX, or PDF |
 
 ### Create
 
@@ -110,6 +122,7 @@ zt <command> [options]
     -> ZoteroPort (application boundary)
       -> HttpZoteroAdapter
         -> Zotero Local API (localhost:23119) or Web API (api.zotero.org)
+        -> Translation Server (localhost:1969) for import
 ```
 
 ## License

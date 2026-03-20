@@ -50,6 +50,11 @@ export interface ZoteroPort {
   // File operations
   uploadAttachment(library: LibrarySelector, parentItemKey: string, filePath: string, contentType: string): Promise<JsonValue>;
   getFileUrl(library: LibrarySelector, itemKey: string): Promise<string>;
+
+  // Translation Server methods
+  resolveIdentifier(identifier: string): Promise<JsonValue>;
+  scrapeUrl(url: string): Promise<JsonValue>;
+  importBibliography(text: string): Promise<JsonValue>;
 }
 
 export interface OutputPort {
