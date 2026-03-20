@@ -405,6 +405,27 @@ export class HttpZoteroAdapter implements ZoteroPort {
     return { success: true, key: attachmentKey } as unknown as JsonValue;
   }
 
+  async downloadAttachment(
+    library: LibrarySelector,
+    itemKey: string
+  ): Promise<Buffer> {
+    const url = this.buildUrl(
+      `${this.libraryPrefix(library)}/items/${itemKey}/file`
+    );
+    const response = await this.http.requestRaw("GET", url, {
+      headers: this.headers(),
+    });
+    if (response.status === 404) {
+      throw new NotFoundError(`Attachment not found: ${itemKey}`);
+    }
+    if (response.status >= 400) {
+      throw new ExternalToolError(
+        `Failed to download attachment (${response.status})`
+      );
+    }
+    return response.data;
+  }
+
   async getFileUrl(
     library: LibrarySelector,
     itemKey: string
@@ -413,6 +434,73 @@ export class HttpZoteroAdapter implements ZoteroPort {
       `${this.libraryPrefix(library)}/items/${itemKey}/file`
     );
     return url;
+  }
+
+  // ── Reparent ────────────────────────────────────────────────────
+
+  async reparentItem(
+    library: LibrarySelector,
+    itemKey: string,
+    newParentKey: string
+  ): Promise<JsonValue> {
+    const item = (await this.getItem(library, itemKey)) as Record<string, JsonValue>;
+    const version = (item["version"] as number) ?? 0;
+    return this.updateItem(
+      library,
+      itemKey,
+      { parentItem: newParentKey } as unknown as JsonValue,
+      version
+    );
+  }
+
+  // ── Better BibTeX ───────────────────────────────────────────────
+
+  private get bbtUrl(): string {
+    const base = this.baseUrl.replace(/\/api\/?$/, "");
+    return `${base}/better-bibtex/json-rpc`;
+  }
+
+  private async bbtRpc(method: string, params: unknown[]): Promise<JsonValue> {
+    const response = await this.http.request("POST", this.bbtUrl, {
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method, params, id: 1 }),
+    });
+    if (response.status >= 400) {
+      throw new ExternalToolError(
+        `Better BibTeX RPC error (${response.status}): ${response.body}`
+      );
+    }
+    const parsed = JSON.parse(response.body) as Record<string, JsonValue>;
+    if (parsed["error"]) {
+      throw new ExternalToolError(
+        `BBT error: ${JSON.stringify(parsed["error"])}`
+      );
+    }
+    return parsed["result"] ?? null;
+  }
+
+  async bbtCiteKeys(itemKeys: string[]): Promise<JsonValue> {
+    return this.bbtRpc("item.citationkey", [itemKeys]);
+  }
+
+  async bbtExport(itemKeys: string[], translator: string): Promise<string> {
+    const result = await this.bbtRpc("item.export", [itemKeys, translator]);
+    return String(result);
+  }
+
+  async bbtSearch(query: string): Promise<JsonValue> {
+    return this.bbtRpc("item.search", [query]);
+  }
+
+  async bbtProbe(): Promise<boolean> {
+    try {
+      const base = this.baseUrl.replace(/\/api\/?$/, "");
+      const url = `${base}/better-bibtex/cayw?probe=true`;
+      const response = await this.http.request("GET", url, {});
+      return response.status === 200;
+    } catch {
+      return false;
+    }
   }
 
   // ── Translation Server methods ────────────────────────────────

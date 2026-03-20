@@ -49,7 +49,17 @@ export interface ZoteroPort {
 
   // File operations
   uploadAttachment(library: LibrarySelector, parentItemKey: string, filePath: string, contentType: string): Promise<JsonValue>;
+  downloadAttachment(library: LibrarySelector, itemKey: string): Promise<Buffer>;
   getFileUrl(library: LibrarySelector, itemKey: string): Promise<string>;
+
+  // Reparent
+  reparentItem(library: LibrarySelector, itemKey: string, newParentKey: string): Promise<JsonValue>;
+
+  // Better BibTeX methods
+  bbtCiteKeys(itemKeys: string[]): Promise<JsonValue>;
+  bbtExport(itemKeys: string[], translator: string): Promise<string>;
+  bbtSearch(query: string): Promise<JsonValue>;
+  bbtProbe(): Promise<boolean>;
 
   // Translation Server methods
   resolveIdentifier(identifier: string): Promise<JsonValue>;

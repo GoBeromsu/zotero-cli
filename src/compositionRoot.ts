@@ -19,6 +19,9 @@ import { FulltextCommand } from "./commands/fulltextCommand.js";
 import { TemplateCommand } from "./commands/templateCommand.js";
 import { TypesInfoCommand } from "./commands/typesInfoCommand.js";
 import { ImportCommand } from "./commands/importCommand.js";
+import { DownloadCommand } from "./commands/downloadCommand.js";
+import { ReparentCommand } from "./commands/reparentCommand.js";
+import { BbtCommand } from "./commands/bbtCommand.js";
 
 export interface Runtime {
   output: OutputPort;
@@ -63,6 +66,9 @@ export function createRuntime(): Runtime {
   registry.register(new TemplateCommand());
   registry.register(new TypesInfoCommand());
   registry.register(new ImportCommand());
+  registry.register(new DownloadCommand());
+  registry.register(new ReparentCommand());
+  registry.register(new BbtCommand());
 
   return { output, zotero, registry, config };
 }
