@@ -15,6 +15,8 @@ export interface SearchOptions extends ListOptions {
   itemType?: string;
 }
 
+export type ExportFormat = "bibtex" | "biblatex" | "ris" | "csljson" | "csv" | "tei" | "wikipedia" | "mods" | "refer";
+
 export interface ZoteroPort {
   listItems(library: LibrarySelector, collectionKey?: string, options?: SearchOptions): Promise<JsonValue>;
   listTopItems(library: LibrarySelector, collectionKey?: string, options?: SearchOptions): Promise<JsonValue>;
@@ -32,6 +34,22 @@ export interface ZoteroPort {
   deleteCollection(library: LibrarySelector, collectionKey: string, version: number): Promise<JsonValue>;
   addToCollection(library: LibrarySelector, itemKey: string, collectionKey: string): Promise<JsonValue>;
   removeFromCollection(library: LibrarySelector, itemKey: string, collectionKey: string): Promise<JsonValue>;
+
+  // Schema/template methods (global, not library-scoped)
+  getItemTypes(): Promise<JsonValue>;
+  getItemTemplate(itemType: string): Promise<JsonValue>;
+  getItemTypeFields(itemType: string): Promise<JsonValue>;
+  getItemTypeCreatorTypes(itemType: string): Promise<JsonValue>;
+
+  // Full-text
+  getFullText(library: LibrarySelector, itemKey: string): Promise<JsonValue>;
+
+  // Export
+  exportItems(library: LibrarySelector, format: string, options?: SearchOptions): Promise<string>;
+
+  // File operations
+  uploadAttachment(library: LibrarySelector, parentItemKey: string, filePath: string, contentType: string): Promise<JsonValue>;
+  getFileUrl(library: LibrarySelector, itemKey: string): Promise<string>;
 }
 
 export interface OutputPort {

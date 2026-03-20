@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { basename } from "node:path";
 import type {
   ZoteroPort,
   ListOptions,
@@ -234,6 +237,179 @@ export class HttpZoteroAdapter implements ZoteroPort {
       { collections } as unknown as JsonValue,
       version
     );
+  }
+
+  // ── Schema/template methods (global, not library-scoped) ─────
+
+  async getItemTypes(): Promise<JsonValue> {
+    const url = "https://api.zotero.org/itemTypes";
+    return this.get(url);
+  }
+
+  async getItemTemplate(itemType: string): Promise<JsonValue> {
+    const url = `https://api.zotero.org/items/new?itemType=${encodeURIComponent(itemType)}`;
+    return this.get(url);
+  }
+
+  async getItemTypeFields(itemType: string): Promise<JsonValue> {
+    const url = `https://api.zotero.org/itemTypeFields?itemType=${encodeURIComponent(itemType)}`;
+    return this.get(url);
+  }
+
+  async getItemTypeCreatorTypes(itemType: string): Promise<JsonValue> {
+    const url = `https://api.zotero.org/itemTypeCreatorTypes?itemType=${encodeURIComponent(itemType)}`;
+    return this.get(url);
+  }
+
+  // ── Full-text ───────────────────────────────────────────────────
+
+  async getFullText(
+    library: LibrarySelector,
+    itemKey: string
+  ): Promise<JsonValue> {
+    const url = this.buildUrl(
+      `${this.libraryPrefix(library)}/items/${itemKey}/fulltext`
+    );
+    return this.get(url);
+  }
+
+  // ── Export ──────────────────────────────────────────────────────
+
+  async exportItems(
+    library: LibrarySelector,
+    format: string,
+    options?: SearchOptions
+  ): Promise<string> {
+    const params = this.searchParams(options);
+    params.set("format", format);
+    const url = this.buildUrl(
+      `${this.libraryPrefix(library)}/items`,
+      params
+    );
+    const response = await this.http.request("GET", url, {
+      headers: this.headers(),
+    });
+    if (response.status >= 400) {
+      throw new ExternalToolError(
+        `Zotero API error (${response.status}): ${response.body || "unknown error"}`
+      );
+    }
+    return response.body;
+  }
+
+  // ── File operations ────────────────────────────────────────────
+
+  async uploadAttachment(
+    library: LibrarySelector,
+    parentItemKey: string,
+    filePath: string,
+    contentType: string
+  ): Promise<JsonValue> {
+    // 1. Get the attachment template
+    const template = (await this.getItemTemplate("attachment&linkMode=imported_file")) as Record<string, JsonValue>;
+
+    // 2. Create the attachment item
+    const fileName = basename(filePath);
+    const attachmentData = {
+      ...template,
+      parentItem: parentItemKey,
+      title: fileName,
+      contentType,
+    };
+    const createUrl = this.buildUrl(
+      `${this.libraryPrefix(library)}/items`
+    );
+    const createResponse = await this.http.request("POST", createUrl, {
+      headers: this.headers({ "Content-Type": "application/json" }),
+      body: JSON.stringify([attachmentData]),
+    });
+    const createResult = await this.parseResponse(createResponse);
+    const successful = (createResult as Record<string, JsonValue>)?.["successful"] as Record<string, JsonValue> | undefined;
+    const created = successful?.["0"] as Record<string, JsonValue> | undefined;
+    const attachmentKey = (created?.["key"] as string) ??
+      ((created?.["data"] as Record<string, JsonValue> | undefined)?.["key"] as string);
+
+    if (!attachmentKey) {
+      throw new ExternalToolError(
+        `Failed to create attachment item: ${JSON.stringify(createResult)}`
+      );
+    }
+
+    // 3. Read the file, compute md5 and size
+    const fileBuffer = await readFile(filePath);
+    const md5 = createHash("md5").update(fileBuffer).digest("hex");
+    const fileSize = fileBuffer.length;
+    const mtime = Date.now();
+
+    // 4. Get upload authorization
+    const authUrl = this.buildUrl(
+      `${this.libraryPrefix(library)}/items/${attachmentKey}/file`
+    );
+    const authBody = new URLSearchParams({
+      md5,
+      filename: fileName,
+      filesize: String(fileSize),
+      mtime: String(mtime),
+    }).toString();
+    const authResponse = await this.http.request("POST", authUrl, {
+      headers: this.headers({
+        "Content-Type": "application/x-www-form-urlencoded",
+        "If-None-Match": "*",
+      }),
+      body: authBody,
+    });
+    const authResult = (await this.parseResponse(authResponse)) as Record<string, JsonValue>;
+
+    // 5. If file already exists on server, we're done
+    if (authResult["exists"] === 1) {
+      return { exists: true, key: attachmentKey } as unknown as JsonValue;
+    }
+
+    // 6. Upload the file to the storage service
+    const uploadUrl = authResult["url"] as string;
+    const prefix = authResult["prefix"] as string ?? "";
+    const suffix = authResult["suffix"] as string ?? "";
+    const uploadContentType = authResult["contentType"] as string;
+    const uploadKey = authResult["uploadKey"] as string;
+
+    // Build the upload body: prefix + file content + suffix
+    const prefixBuf = Buffer.from(prefix, "utf-8");
+    const suffixBuf = Buffer.from(suffix, "utf-8");
+    const uploadBody = Buffer.concat([prefixBuf, fileBuffer, suffixBuf]);
+
+    const uploadResponse = await this.http.request("POST", uploadUrl, {
+      headers: { "Content-Type": uploadContentType },
+      body: uploadBody.toString("binary"),
+    });
+
+    if (uploadResponse.status >= 400) {
+      throw new ExternalToolError(
+        `File upload failed (${uploadResponse.status}): ${uploadResponse.body || "unknown error"}`
+      );
+    }
+
+    // 7. Register the upload
+    const registerBody = new URLSearchParams({ upload: uploadKey }).toString();
+    const registerResponse = await this.http.request("POST", authUrl, {
+      headers: this.headers({
+        "Content-Type": "application/x-www-form-urlencoded",
+        "If-None-Match": "*",
+      }),
+      body: registerBody,
+    });
+    await this.parseResponse(registerResponse);
+
+    return { success: true, key: attachmentKey } as unknown as JsonValue;
+  }
+
+  async getFileUrl(
+    library: LibrarySelector,
+    itemKey: string
+  ): Promise<string> {
+    const url = this.buildUrl(
+      `${this.libraryPrefix(library)}/items/${itemKey}/file`
+    );
+    return url;
   }
 
   // ── Helpers ────────────────────────────────────────────────────

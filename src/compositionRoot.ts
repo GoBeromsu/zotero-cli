@@ -11,7 +11,13 @@ import { ItemGetCommand } from "./commands/itemGetCommand.js";
 import { SearchCommand } from "./commands/searchCommand.js";
 import { TagsCommand } from "./commands/tagsCommand.js";
 import { CreateCollectionCommand } from "./commands/createCollectionCommand.js";
+import { CreateItemCommand } from "./commands/createItemCommand.js";
 import { DeleteCommand } from "./commands/deleteCommand.js";
+import { AttachCommand } from "./commands/attachCommand.js";
+import { ExportCommand } from "./commands/exportCommand.js";
+import { FulltextCommand } from "./commands/fulltextCommand.js";
+import { TemplateCommand } from "./commands/templateCommand.js";
+import { TypesInfoCommand } from "./commands/typesInfoCommand.js";
 
 export interface Runtime {
   output: OutputPort;
@@ -45,7 +51,13 @@ export function createRuntime(): Runtime {
   registry.register(new SearchCommand());
   registry.register(new TagsCommand());
   registry.register(new CreateCollectionCommand());
+  registry.register(new CreateItemCommand());
   registry.register(new DeleteCommand());
+  registry.register(new AttachCommand());
+  registry.register(new ExportCommand());
+  registry.register(new FulltextCommand());
+  registry.register(new TemplateCommand());
+  registry.register(new TypesInfoCommand());
 
   return { output, zotero, registry, config };
 }
