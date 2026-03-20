@@ -1,5 +1,5 @@
 {
-  "name": "zotero-cli",
+  "name": "@beomsukoh/zotero-cli",
   "version": "0.2.0",
   "description": "Pure CLI wrapper for the Zotero API.",
   "type": "module",
