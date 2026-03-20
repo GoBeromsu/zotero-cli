@@ -1,0 +1,35 @@
+{
+  "name": "zotero-cli",
+  "version": "0.1.0",
+  "description": "Pure CLI wrapper for the Zotero API.",
+  "type": "module",
+  "bin": {
+    "zt": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "check": "tsc --noEmit && node ./scripts/validate-docs.mjs",
+    "dt": "tsx ./src/cli.ts",
+    "test": "vitest run",
+    "test:smoke": "vitest run --config vitest.config.smoke.ts",
+    "release:check": "pnpm check && pnpm test && pnpm build && pnpm pack:check",
+    "pack:check": "pnpm build && npm pack --dry-run",
+    "prepack": "pnpm build",
+    "prepublishOnly": "pnpm check && pnpm test && pnpm pack:check"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.0.0"
+  }
+}
